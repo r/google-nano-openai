@@ -25,8 +25,8 @@
   ],
   "files": [
     "server.ts",
-    "bridge.html",
     "README.md",
+    "ARCHITECTURE.md",
     "LICENSE"
   ]
 }

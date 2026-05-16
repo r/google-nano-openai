@@ -15,7 +15,11 @@ The only thing that can run it is Chrome. So `nano-openai`:
 
 1. Launches a headless Chrome on a dedicated profile (`./chrome-profile/`).
 2. That Chrome hosts the model via the built-in **Prompt API** (`LanguageModel`).
-3. A tiny page (`bridge.html`) relays jobs to/from a local OpenAI-shaped endpoint.
+3. A tiny bridge page (embedded in `server.ts`) relays jobs to/from a local
+   OpenAI-shaped endpoint.
+
+For the full design — data flow, the bridge protocol, and the trade-offs —
+see [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Requirements
 
@@ -48,7 +52,7 @@ curl localhost:8765/v1/chat/completions -H 'content-type: application/json' -d '
 }'
 ```
 
-Streaming works (`"stream": true`), as does any OpenAI client:
+Any OpenAI client works too:
 
 ```python
 from openai import OpenAI
@@ -62,7 +66,8 @@ print(client.chat.completions.create(
 ## Endpoints
 
 - `GET  /v1/models`
-- `POST /v1/chat/completions` — supports `stream`, system messages, multi-turn history
+- `POST /v1/chat/completions` — system messages and multi-turn history; replies
+  are buffered, not streamed
 - `GET  /healthz` — bridge/model status
 
 ## Config (env vars)
@@ -76,6 +81,7 @@ print(client.chat.completions.create(
 ## Notes / limits
 
 - Gemini Nano is small; expect short, simple completions. No tool use.
+- No streaming — `"stream": true` is ignored; the full reply comes at once.
 - `temperature`, `top_k` and `max_tokens` are ignored — model defaults only.
 - Don't redistribute `weights.bin` — unclear license. Local use only.
 - `Ctrl-C` stops the server and its background Chrome.
