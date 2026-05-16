@@ -63,6 +63,29 @@ print(client.chat.completions.create(
 ).choices[0].message.content)
 ```
 
+## Chat from the command line
+
+`chat.ts` is a tiny interactive client — it connects to the running server
+through the official `openai` SDK and lets you hold a conversation:
+
+```sh
+npm install        # one-time: the `openai` SDK (dev-only; the server needs nothing)
+node chat.ts       # or: npm run chat
+```
+
+```
+nano-openai chat — type a message, "exit" to quit.
+
+you  what is a haiku?
+nano A haiku is a three-line poem with 5, 7, and 5 syllables.
+
+you  exit
+bye.
+```
+
+It replays the full conversation on each request, so context carries across
+turns. `exit`, Ctrl-C, or Ctrl-D quits.
+
 ## Endpoints
 
 - `GET  /v1/models`

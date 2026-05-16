@@ -10,7 +10,8 @@
   },
   "main": "server.ts",
   "scripts": {
-    "start": "node server.ts"
+    "start": "node server.ts",
+    "chat": "node chat.ts"
   },
   "engines": {
     "node": ">=22.18"
@@ -28,5 +29,8 @@
     "README.md",
     "ARCHITECTURE.md",
     "LICENSE"
-  ]
+  ],
+  "devDependencies": {
+    "openai": "^6.38.0"
+  }
 }
