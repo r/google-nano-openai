@@ -71,6 +71,7 @@ const text = (c: any): string =>
 // Responses are not streamed; a `"stream": true` in the request is ignored.
 async function chat(req: IncomingMessage, res: ServerResponse) {
   const b = await body(req);
+  log(`chat: ${(b.messages ?? []).length} message(s)`);
   if (!bridge || !ready) return json(res, 503, { error: { message: 'Gemini Nano not ready' } });
 
   const messages: Msg[] = (b.messages ?? []).map((m: any) => ({
