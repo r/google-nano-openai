@@ -3,116 +3,64 @@
 <title>Gemini Nano bridge</title>
 <body style="font-family:system-ui;margin:1.5em;color:#222">
 <h3>Gemini Nano &harr; OpenAI bridge</h3>
-<p>This Chrome page hosts the on-device model. Keep it open.</p>
+<p>This headless Chrome page hosts the on-device model. Keep it running.</p>
 <pre id="log" style="background:#f4f4f4;padding:1em;white-space:pre-wrap"></pre>
 <script>
 const logEl = document.getElementById('log');
 function log(...a) {
   const line = a.join(' ');
   logEl.textContent += line + '\n';
-  console.log(...a);
-  fetch('/bridge/log', { method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ line }) }).catch(() => {});
+  fetch('/bridge/log', { method: 'POST', body: JSON.stringify({ line }) }).catch(() => {});
 }
-async function post(path, body) {
-  try {
-    await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(body) });
-  } catch (e) { /* ignore */ }
-}
+const post = (path, body) =>
+  fetch(path, { method: 'POST', body: JSON.stringify(body) }).catch(() => {});
 
 async function init() {
   if (!('LanguageModel' in self)) {
-    log('ERROR: LanguageModel API not present — Prompt API flags not applied.');
-    await post('/bridge/hello', { availability: 'no-api' });
-    return;
+    log('ERROR: Prompt API (LanguageModel) not available — flags not applied.');
+    return post('/bridge/hello', { availability: 'no-api' });
   }
-  let avail = 'unknown';
-  try { avail = await LanguageModel.availability(); }
-  catch (e) { log('availability() threw:', e.message || e); }
+  let avail = await LanguageModel.availability();
   log('availability:', avail);
-
-  let params = null;
-  try { params = await LanguageModel.params(); log('params:', JSON.stringify(params)); }
-  catch (e) { /* ignore */ }
-
+  // Anything other than available/unavailable means the model needs a load/download.
   if (avail !== 'available' && avail !== 'unavailable') {
-    log('model is "' + avail + '" — attempting to trigger load...');
+    log('triggering model load...');
     try {
       const s = await LanguageModel.create({
-        monitor(m) {
-          m.addEventListener('downloadprogress', (e) =>
-            log('load progress:', Math.round((e.loaded || 0) * 100) + '%'));
-        },
+        monitor: (m) => m.addEventListener('downloadprogress',
+          (e) => log('download', Math.round((e.loaded || 0) * 100) + '%')),
       });
       s.destroy();
       avail = await LanguageModel.availability();
-      log('availability after trigger:', avail);
-    } catch (e) {
-      log('trigger create() failed:', e.message || e);
-    }
+      log('availability now:', avail);
+    } catch (e) { log('load failed:', e.message || e); }
   }
-
-  await post('/bridge/hello', { availability: avail, params });
-  if (avail === 'available') connect();
-  else log('Bridge NOT ready (availability=' + avail + ').');
+  await post('/bridge/hello', { availability: avail });
+  if (avail === 'available') {
+    log('connected — server is READY.');
+    new EventSource('/bridge/events').onmessage =
+      (ev) => { try { run(JSON.parse(ev.data)); } catch {} };
+  }
 }
 
-function connect() {
-  log('opening job stream...');
-  const es = new EventSource('/bridge/events');
-  es.onopen = () => log('job stream open — server is READY.');
-  es.onerror = () => log('job stream error (auto-retry)...');
-  es.onmessage = (ev) => {
-    let msg;
-    try { msg = JSON.parse(ev.data); } catch { return; }
-    if (msg.type === 'job') runJob(msg);
-  };
-}
-
-async function runJob({ id, opts }) {
-  const t0 = performance.now();
-  log('job ' + id + ' started');
+async function run({ id, messages }) {
   let session;
   try {
-    const msgs = opts.messages || [];
-    const last = msgs[msgs.length - 1] || { role: 'user', content: '' };
-    const history = msgs.slice(0, -1);
-
-    const createOpts = {};
-    const initialPrompts = history.map((m) => ({
-      role: m.role === 'assistant' ? 'assistant' : (m.role === 'system' ? 'system' : 'user'),
-      content: m.content,
-    }));
-    if (initialPrompts.length) createOpts.initialPrompts = initialPrompts;
-
-    if (typeof opts.temperature === 'number') {
-      const p = await LanguageModel.params();
-      createOpts.temperature = Math.max(0, Math.min(opts.temperature, p.maxTemperature || 2));
-      createOpts.topK = typeof opts.topK === 'number'
-        ? Math.max(1, Math.min(opts.topK, p.maxTopK || 8))
-        : (p.defaultTopK || 3);
-    }
-
-    session = await LanguageModel.create(createOpts);
-
-    const stream = session.promptStreaming(last.content);
+    const history = messages.slice(0, -1);
+    const last = messages[messages.length - 1]?.content ?? '';
+    session = await LanguageModel.create(history.length ? { initialPrompts: history } : {});
     let acc = '';
-    for await (const piece of stream) {
+    for await (const piece of session.promptStreaming(last)) {
       // Chrome has shipped both cumulative and delta chunks — handle both.
-      let delta = piece;
-      if (piece.startsWith(acc)) { delta = piece.slice(acc.length); acc = piece; }
-      else acc += piece;
+      const delta = piece.startsWith(acc) ? piece.slice(acc.length) : piece;
+      acc = piece.startsWith(acc) ? piece : acc + piece;
       if (delta) await post('/bridge/chunk', { id, delta });
     }
     await post('/bridge/done', { id });
-    log('job ' + id + ' done — ' + acc.length + ' chars in ' +
-      Math.round(performance.now() - t0) + 'ms');
   } catch (e) {
-    log('job ' + id + ' ERROR: ' + (e.message || e));
     await post('/bridge/done', { id, error: String(e.message || e) });
   } finally {
-    try { if (session) session.destroy(); } catch {}
+    session?.destroy();
   }
 }
 
