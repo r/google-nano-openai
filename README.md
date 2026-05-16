@@ -23,14 +23,49 @@ The only thing that can run this file is Chrome itself. So `nano-openai`:
 
 The model that answers is bit-for-bit the `weights.bin` Chrome installed.
 
+## Setup
+
+There is **nothing to `npm install`** — `server.js` uses only Node built-ins
+and the global `fetch`/`WebSocket` (hence Node >= 22). You need:
+
+- **macOS** on an APFS volume (for the instant copy-on-write model clone).
+- **Google Chrome** installed at the standard location, or set `NANO_CHROME`.
+- The **Gemini Nano on-device model** available to Chrome (see below).
+
+### Getting the model (`weights.bin`)
+
+`nano-openai` never downloads or ships the model. It uses the ~4 GB
+`weights.bin` that Chrome installs at:
+
+```
+~/Library/Application Support/Google/Chrome/OptGuideOnDeviceModel/
+```
+
+You get it one of two ways:
+
+1. **You already have it.** If you've used Chrome's built-in AI features, the
+   folder above already exists. On first run `nano-openai` clones it into a
+   dedicated profile via APFS copy-on-write — instant, ~0 extra disk, and your
+   real Chrome profile is never touched.
+2. **You don't have it yet.** If that folder is missing, `nano-openai` logs a
+   warning and continues. The dedicated headless Chrome it launches will then
+   try to **download** the model itself (Chrome verifies hardware and fetches
+   the component). This takes longer and needs ~free disk + a capable machine.
+
+Either way, the model ends up only inside this project's `chrome-profile/`
+directory (git-ignored), separate from your everyday Chrome.
+
 ## Run
 
 ```sh
 node server.js
+# or: npm start
 ```
 
-First start takes ~15–20 s (Chrome verifies/installs the model component).
-When you see `READY`, the endpoint is live.
+The first start takes ~15–20 s while Chrome verifies/installs the model
+component (longer if it has to download it). Watch the log — when you see
+`READY`, the endpoint is live. `GET /healthz` reports the current
+`availability` if it's still starting up.
 
 ```sh
 # list models
@@ -86,13 +121,6 @@ print(client.chat.completions.create(
 - Gemini Nano is small; expect short, simple completions. No tool use here.
 - `max_tokens` is ignored (the Prompt API has no hard output cap).
 - Don't redistribute `weights.bin` — unclear license. This is local use only.
-
-## Requirements
-
-- macOS with Google Chrome installed (the on-device model must already be
-  present in your Chrome profile).
-- Node.js >= 22 (uses the built-in `fetch` and `WebSocket` globals; no
-  dependencies to install).
 
 ## License
 
