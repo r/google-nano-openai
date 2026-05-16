@@ -1,0 +1,31 @@
+{
+  "name": "nano-openai",
+  "version": "1.0.0",
+  "description": "Run Chrome's on-device Gemini Nano behind an OpenAI-compatible local HTTP API",
+  "license": "MIT",
+  "author": "Raffi Krikorian",
+  "bin": {
+    "nano-openai": "server.js"
+  },
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "keywords": [
+    "gemini-nano",
+    "openai",
+    "chrome",
+    "on-device",
+    "llm",
+    "prompt-api"
+  ],
+  "files": [
+    "server.js",
+    "bridge.html",
+    "README.md",
+    "LICENSE"
+  ]
+}

@@ -1,0 +1,11 @@
+# dedicated Chrome profile (holds a ~4GB clone of the on-device model)
+chrome-profile/
+
+# runtime logs
+chrome.log
+server.log
+*.log
+
+# OS / editor cruft
+.DS_Store
+node_modules/
