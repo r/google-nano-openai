@@ -171,20 +171,11 @@ server.listen(PORT, () => {
 // --- the page headless Chrome loads -----------------------------------------
 // Embedded so this stays a single file. It hosts the model via the Prompt API,
 // opens the control SSE, runs each job, and POSTs the result to /bridge/done.
-const BRIDGE_HTML = `<!doctype html>
-<meta charset="utf-8">
-<title>Gemini Nano bridge</title>
-<body style="font-family:system-ui;margin:1.5em;color:#222">
-<h3>Gemini Nano &harr; OpenAI bridge</h3>
-<p>This headless Chrome page hosts the on-device model. Keep it running.</p>
-<pre id="log" style="background:#f4f4f4;padding:1em;white-space:pre-wrap"></pre>
+const BRIDGE_HTML = `<!doctype html><meta charset="utf-8">
 <script>
-const logEl = document.getElementById('log');
-function log(...a) {
-  const line = a.join(' ');
-  logEl.textContent += line + '\\n';
-  fetch('/bridge/log', { method: 'POST', body: JSON.stringify({ line }) }).catch(() => {});
-}
+const log = (...a) =>
+  fetch('/bridge/log', { method: 'POST', body: JSON.stringify({ line: a.join(' ') }) })
+    .catch(() => {});
 const post = (path, body) =>
   fetch(path, { method: 'POST', body: JSON.stringify(body) }).catch(() => {});
 
@@ -199,6 +190,7 @@ async function init() {
   if (avail !== 'available' && avail !== 'unavailable') {
     log('triggering model load...');
     try {
+      // This create() call is what loads Chrome's weights.bin (~4 GB) into memory.
       const s = await LanguageModel.create({
         monitor: (m) => m.addEventListener('downloadprogress',
           (e) => log('download', Math.round((e.loaded || 0) * 100) + '%')),
