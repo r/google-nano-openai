@@ -20,13 +20,13 @@ const client = new OpenAI({
 });
 
 const rl = createInterface({ input: process.stdin, output: process.stdout });
-rl.on('SIGINT', () => { console.log('\nbye.'); process.exit(0); });
+rl.on('SIGINT', () => process.exit(0));
 
 // The whole conversation, replayed on every request so the model has context.
 const history: { role: 'user' | 'assistant'; content: string }[] = [];
 
 console.log('nano-openai chat — type a message, "exit" to quit.\n');
-process.stdout.write('you  ');
+process.stdout.write('[you] ');
 
 // `for await` queues lines that arrive while a reply is still generating,
 // so nothing typed ahead (or piped in) is lost.
@@ -36,25 +36,19 @@ for await (const line of rl) {
   if (input) {
     history.push({ role: 'user', content: input });
     try {
-      const res = await client.chat.completions.create({
-        model: 'gemini-nano',
-        messages: history,
-      });
+      const res = await client.chat.completions.create({ model: 'gemini-nano', messages: history });
       const reply = res.choices[0]?.message.content?.trim() || '(empty reply)';
       history.push({ role: 'assistant', content: reply });
-      console.log('nano ' + reply + '\n');
+      console.log('[nano] ' + reply + '\n');
     } catch (err) {
       history.pop();                          // forget the failed turn
-      if (err instanceof OpenAI.APIConnectionError)
-        console.log('!! cannot reach the server — is `node server.ts` running?\n');
-      else if (err instanceof OpenAI.APIError && err.status === 503)
-        console.log('!! server is up but the model is not READY yet — check its log.\n');
-      else
-        console.log('!! ' + (err instanceof Error ? err.message : String(err)) + '\n');
+      console.log('!! ' + (
+        err instanceof OpenAI.APIConnectionError ? 'cannot reach the server — is `node server.ts` running?'
+        : err instanceof OpenAI.APIError && err.status === 503 ? 'server is up but the model is not READY yet — check its log.'
+        : err instanceof Error ? err.message : String(err)) + '\n');
     }
   }
-  process.stdout.write('you  ');
+  process.stdout.write('[you] ');
 }
 
-rl.close();
 console.log('\nbye.');
